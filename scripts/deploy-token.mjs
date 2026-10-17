@@ -39,6 +39,8 @@ Flags:
   --compliance-node  Compliance contract address                   [optional]
   --auth-required    Holders must be authorized before receiving   [optional]
   --auth-revocable   Admin may revoke holder authorization         [optional]
+  --fee-bps      Transfer fee in basis points (0-1000)             [required]
+  --fee-recipient  Fee recipient address                           [required]
 `.trim();
 
 function parseArgs(argv) {
@@ -88,7 +90,7 @@ function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) { console.log(USAGE); process.exit(0); }
 
-  for (const flag of ["network", "source", "name", "symbol", "supply"]) {
+  for (const flag of ["network", "source", "name", "symbol", "supply", "fee-bps", "fee-recipient"]) {
     if (typeof args[flag] !== "string") {
       console.error(`Error: --${flag} is required.\n\n${USAGE}`);
       process.exit(1);
@@ -101,7 +103,19 @@ function main() {
     console.error("Error: --decimals must be an integer between 0 and 18.");
     process.exit(1);
   }
+  // Validate fee-bps
+  const feeBps = Number(args["fee-bps"]);
+  if (!Number.isInteger(feeBps) || feeBps < 0 || feeBps > 1000) {
+    console.error("Error: --fee-bps must be an integer between 0 and 1000.");
+    process.exit(1);
+  }
 
+  // Validate fee-recipient
+  const feeRecipient = args["fee-recipient"];
+  if (!/^G[A-Z2-7]{55}$/.test(feeRecipient)) {
+    console.error("Error: --fee-recipient must be a valid Stellar address.");
+    process.exit(1);
+  }
   const factory = (typeof args.factory === "string" && args.factory) || readFactoryFromEnv(network);
   if (!factory) {
     console.error(
@@ -146,6 +160,8 @@ function main() {
     max_supply: maxSupply === null ? null : maxSupply.toString(),
     name,
     symbol,
+    fee_bps: feeBps,
+    fee_recipient: feeRecipient,
   };
 
   console.log(`\nLaunching ${name} (${symbol}) on ${network} via factory ${factory}\n`);
